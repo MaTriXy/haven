@@ -2,25 +2,32 @@ package org.havenapp.main.ui;
 
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.drawable.BitmapDrawable;
+import android.media.ThumbnailUtils;
 import android.net.Uri;
+import android.provider.MediaStore;
+import android.support.v4.content.FileProvider;
 import android.support.v7.widget.RecyclerView;
+import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.VideoView;
 
 import com.github.derlio.waveform.SimpleWaveformView;
 import com.github.derlio.waveform.soundfile.SoundFile;
-import com.squareup.picasso.Picasso;
 import com.stfalcon.frescoimageviewer.ImageViewer;
+
+import org.havenapp.main.R;
+import org.havenapp.main.model.EventTrigger;
+import org.w3c.dom.Text;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.havenapp.main.R;
-import org.havenapp.main.model.EventTrigger;
 import nl.changer.audiowife.AudioWife;
 
 /**
@@ -29,22 +36,30 @@ import nl.changer.audiowife.AudioWife;
 
 public class EventTriggerAdapter extends RecyclerView.Adapter<EventTriggerAdapter.EventTriggerVH> {
 
-    Context context;
-    List<EventTrigger> eventTriggers;
-    ArrayList<String> eventTriggerImagePaths;
+    private Context context;
+    private List<EventTrigger> eventTriggers;
+    private ArrayList<Uri> eventTriggerImagePaths;
 
-    OnItemClickListener clickListener;
+    private OnItemClickListener clickListener;
+
+    private final static String AUTHORITY = "org.havenapp.main.fileprovider";
 
     public EventTriggerAdapter(Context context, List<EventTrigger> eventTriggers) {
         this.context = context;
         this.eventTriggers = eventTriggers;
 
-        this.eventTriggerImagePaths = new ArrayList<String>();
+        this.eventTriggerImagePaths = new ArrayList<>();
         for (EventTrigger trigger : eventTriggers)
         {
-            if (trigger.getType() == EventTrigger.CAMERA)
+            if (trigger.getType() == EventTrigger.CAMERA
+                    && (!TextUtils.isEmpty(trigger.getPath())))
             {
-                eventTriggerImagePaths.add("file:///" + trigger.getPath());
+                Uri fileUri = FileProvider.getUriForFile(
+                        context,
+                        AUTHORITY,
+                        new File(trigger.getPath()));
+
+                eventTriggerImagePaths.add(fileUri);
             }
         }
     }
@@ -52,10 +67,9 @@ public class EventTriggerAdapter extends RecyclerView.Adapter<EventTriggerAdapte
 
     @Override
     public EventTriggerVH onCreateViewHolder(ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.event_item, parent, false);
-        EventTriggerVH viewHolder = new EventTriggerVH(view);
+        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_event, parent, false);
 
-        return viewHolder;
+        return new EventTriggerVH(view);
     }
 
     @Override
@@ -67,30 +81,56 @@ public class EventTriggerAdapter extends RecyclerView.Adapter<EventTriggerAdapte
         String desc = eventTrigger.getTriggerTime().toLocaleString();
 
         holder.image.setVisibility(View.GONE);
+        holder.video.setVisibility(View.GONE);
         holder.extra.setVisibility(View.GONE);
         holder.sound.setVisibility(View.GONE);
 
-
         if (eventTrigger.getPath() != null)
         {
-            if (eventTrigger.getType() == EventTrigger.CAMERA)
-            {
-                holder.image.setVisibility(View.VISIBLE);
-                Picasso.with(context).load(new File(eventTrigger.getPath())).into(holder.image);
-                holder.image.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View view) {
+            switch (eventTrigger.getType()) {
+                case EventTrigger.CAMERA_VIDEO:
+                    holder.video.setVisibility(View.VISIBLE);
+                    BitmapDrawable bitmapD = new BitmapDrawable(context.getResources(), ThumbnailUtils.createVideoThumbnail(eventTrigger.getPath(),
+                            MediaStore.Video.Thumbnails.FULL_SCREEN_KIND));
+                    holder.video.setBackground(bitmapD);
+                    holder.video.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View view) {
+                            Intent intent = new Intent(context, VideoPlayerActivity.class);
+                            intent.setData(Uri.parse("file://" + eventTrigger.getPath()));
+                            context.startActivity(intent);
+                        }
+                    });
+
+                    holder.video.setOnLongClickListener(new View.OnLongClickListener() {
+                        @Override
+                        public boolean onLongClick(View view) {
+                            shareMedia(eventTrigger);
+                            return false;
+                        }
+                    });
+                    break;
+                case EventTrigger.CAMERA:
+                    holder.image.setVisibility(View.VISIBLE);
+
+                    Uri fileUri = FileProvider.getUriForFile(
+                            context,
+                            AUTHORITY,
+                            new File(eventTrigger.getPath()));
+                    //Picasso.get().load(fileUri).into(holder.image);
+                    holder.image.setImageURI(fileUri);
+
+                    holder.image.setOnClickListener(view -> {
 
                         int startPosition = 0;
-                        for (int i = 0; i < eventTriggerImagePaths.size(); i++)
-                        {
-                            if (eventTriggerImagePaths.get(i).contains(eventTrigger.getPath()))
-                            {
+
+                        /**
+                        for (int i = 0; i < eventTriggerImagePaths.size(); i++) {
+                            if (eventTriggerImagePaths.get(i).contains(eventTrigger.getPath())) {
                                 startPosition = i;
                                 break;
                             }
-                        }
-
+                        }**/
 
                         ShareOverlayView overlayView = new ShareOverlayView(context);
                         ImageViewer viewer = new ImageViewer.Builder(context, eventTriggerImagePaths)
@@ -100,69 +140,61 @@ public class EventTriggerAdapter extends RecyclerView.Adapter<EventTriggerAdapte
                         overlayView.setImageViewer(viewer);
 
 
-                    }
-                });
+                    });
 
-                holder.image.setOnLongClickListener(new View.OnLongClickListener() {
-                    @Override
-                    public boolean onLongClick(View view) {
+                    holder.image.setOnLongClickListener(view -> {
                         shareMedia(eventTrigger);
                         return false;
-                    }
-                });
-            }
-            else if (eventTrigger.getType() == EventTrigger.MICROPHONE)
-            {
-                LayoutInflater inflater = (LayoutInflater) context.getSystemService( Context.LAYOUT_INFLATER_SERVICE );
+                    });
+                    break;
+                case EventTrigger.MICROPHONE:
+                    LayoutInflater inflater = (LayoutInflater) context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
 
-                holder.sound.setVisibility(View.VISIBLE);
-                final File fileSound = new File(eventTrigger.getPath());
-                try {
-                    final SoundFile soundFile = SoundFile.create(fileSound.getPath(), new SoundFile.ProgressListener() {
-                        int lastProgress = 0;
+                    holder.sound.setVisibility(View.VISIBLE);
+                    final File fileSound = new File(eventTrigger.getPath());
+                    try {
+                        final SoundFile soundFile = SoundFile.create(fileSound.getPath(), new SoundFile.ProgressListener() {
+                            int lastProgress = 0;
 
-                        @Override
-                        public boolean reportProgress(double fractionComplete) {
-                            final int progress = (int) (fractionComplete * 100);
-                            if (lastProgress == progress) {
+                            @Override
+                            public boolean reportProgress(double fractionComplete) {
+                                final int progress = (int) (fractionComplete * 100);
+                                if (lastProgress == progress) {
+                                    return true;
+                                }
+                                lastProgress = progress;
+
                                 return true;
                             }
-                            lastProgress = progress;
+                        });
+                        holder.sound.setAudioFile(soundFile);
+                        holder.sound.invalidate();
+                    } catch (Exception e) {
+                    }
 
-                            return true;
-                        }
-                    });
-                    holder.sound.setAudioFile(soundFile);
-                    holder.sound.invalidate();
-                }
-                catch (Exception e){}
+                    holder.extra.setVisibility(View.VISIBLE);
+                    holder.extra.removeAllViews();
 
-                holder.extra.setVisibility(View.VISIBLE);
-                holder.extra.removeAllViews();
-
-                AudioWife audioWife = new AudioWife();
-                audioWife.init(context, Uri.fromFile(fileSound))
-                        .useDefaultUi(holder.extra, inflater);
+                    AudioWife audioWife = new AudioWife();
+                    audioWife.init(context, Uri.fromFile(fileSound))
+                            .useDefaultUi(holder.extra, inflater);
 
 
-            }
-            else if (eventTrigger.getType() == EventTrigger.ACCELEROMETER)
-            {
-                desc += "\n" + context.getString(R.string.data_speed) + ": " + eventTrigger.getPath();
+                    break;
+                case EventTrigger.ACCELEROMETER:
+                    desc += "\n" + context.getString(R.string.data_speed) + ": " + eventTrigger.getPath();
 
-            }
-            else if (eventTrigger.getType() == EventTrigger.LIGHT)
-            {
-                desc += "\n" + context.getString(R.string.data_light) + ": " + eventTrigger.getPath();
+                    break;
+                case EventTrigger.LIGHT:
+                    desc += "\n" + context.getString(R.string.data_light) + ": " + eventTrigger.getPath();
 
-            }
-            else if (eventTrigger.getType() == EventTrigger.PRESSURE)
-            {
-                desc += "\n" + context.getString(R.string.data_pressure) + ": " + eventTrigger.getPath();
-            }
-            else if (eventTrigger.getType() == EventTrigger.POWER)
-            {
-                desc += "\n" + context.getString(R.string.data_power) + ": " + eventTrigger.getPath();
+                    break;
+                case EventTrigger.PRESSURE:
+                    desc += "\n" + context.getString(R.string.data_pressure) + ": " + eventTrigger.getPath();
+                    break;
+                case EventTrigger.POWER:
+                    desc += "\n" + context.getString(R.string.data_power) + ": " + eventTrigger.getPath();
+                    break;
             }
 
         }
@@ -199,16 +231,18 @@ public class EventTriggerAdapter extends RecyclerView.Adapter<EventTriggerAdapte
     class EventTriggerVH extends RecyclerView.ViewHolder implements View.OnClickListener {
         TextView title, note;
         ImageView image;
+        VideoView video;
         ViewGroup extra;
         SimpleWaveformView sound;
         public EventTriggerVH(View itemView) {
             super(itemView);
 
-           title = (TextView) itemView.findViewById(R.id.event_item_title);
-            note = (TextView) itemView.findViewById(R.id.event_item_desc);
-            image = (ImageView) itemView.findViewById(R.id.event_item_image);
-            extra = (ViewGroup)itemView.findViewById(R.id.event_item_extra);
-            sound = (SimpleWaveformView) itemView.findViewById(R.id.event_item_sound);
+           title = itemView.findViewById(R.id.event_item_title);
+            note = itemView.findViewById(R.id.event_item_desc);
+            image = itemView.findViewById(R.id.event_item_image);
+            video = itemView.findViewById(R.id.event_item_video);
+            extra = itemView.findViewById(R.id.event_item_extra);
+            sound = itemView.findViewById(R.id.event_item_sound);
             itemView.setOnClickListener(this);
         }
 

@@ -9,40 +9,50 @@
 package org.havenapp.main.ui;
 
 import android.os.Bundle;
-import android.graphics.Bitmap;
 import android.support.v4.app.Fragment;
-import android.hardware.Camera;
 import android.hardware.SensorEvent;
+import android.support.v7.preference.PreferenceFragmentCompat;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
-import android.widget.FrameLayout;
+import android.widget.TextView;
+
+import com.google.android.cameraview.CameraView;
 
 import org.havenapp.main.PreferenceManager;
 import org.havenapp.main.R;
-import org.havenapp.main.sensors.media.MotionAsyncTask;
-import org.havenapp.main.sensors.media.ImageCodec;
-import org.havenapp.main.sensors.motion.Preview;
+import org.havenapp.main.sensors.motion.CameraViewHolder;
 
 public final class CameraFragment extends Fragment {
 
-    private Preview preview;
-
-//    private ImageView oldImage;
+    private CameraViewHolder cameraViewHolder;
     private ImageView newImage;
+    private PreferenceManager prefs;
+    private TextView txtCameraStatus;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
 
-        return inflater.inflate(R.layout.camera_fragment, container, false);
+        View view = inflater.inflate(R.layout.camera_fragment, container, false);
 
+        newImage = view.findViewById(R.id.new_image);
+        txtCameraStatus = view.findViewById(R.id.camera_status_display);
+
+        return view;
+
+    }
+
+    public void setMotionSensitivity (int threshold)
+    {
+        cameraViewHolder.setMotionSensitivity(threshold);
     }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        prefs = new PreferenceManager(getContext());
     }
 
     @Override
@@ -53,52 +63,81 @@ public final class CameraFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
+       // if (cameraViewHolder == null)
+            initCamera();
 
-        initCamera ();
+
+        cameraViewHolder.setMotionSensitivity(prefs.getCameraSensitivity());
     }
 
-    public void resetCamera ()
+    public void updateCamera ()
     {
-        ((FrameLayout) getActivity().findViewById(R.id.preview)).removeAllViews();
-        preview = null;
-        initCamera();
-    }
-
-    private void initCamera ()
-    {
-        if (preview == null) {
-
-            PreferenceManager prefs = new PreferenceManager(getActivity());
-
-            if (prefs.getCameraSensitivity() != PreferenceManager.OFF) {
-                //Uncomment to see the camera
-                preview = new Preview(getActivity());
-
-                ((FrameLayout) getActivity().findViewById(R.id.preview)).addView(preview);
-
-                // oldImage = (ImageView) getActivity().findViewById(R.id.old_image);
-                newImage = (ImageView) getActivity().findViewById(R.id.new_image);
-
-                preview.addListener(new MotionAsyncTask.MotionListener() {
-
-                    public void onProcess(Bitmap oldBitmap, Bitmap newBitmap, Bitmap rawBitmap,
-                                          boolean motionDetected) {
-                        int rotation = 0;
-                        boolean reflex = false;
-                        if (preview.getCameraFacing() == Camera.CameraInfo.CAMERA_FACING_BACK) {
-                            rotation = 90;
-                        } else {
-                            rotation = 270;
-                            reflex = true;
-                        }
-
-                        // oldImage.setImageBitmap(ImageCodec.rotate(oldBitmap, rotation, reflex));
-                        newImage.setImageBitmap(ImageCodec.rotate(newBitmap, rotation, reflex));
-                    }
-                });
-            }
+        if (cameraViewHolder != null) {
+            cameraViewHolder.updateCamera();
         }
     }
+
+    public void stopCamera ()
+    {
+        if (cameraViewHolder != null) {
+            cameraViewHolder.stopCamera();
+        }
+    }
+
+    /**
+    public void resetCamera ()
+    {
+        stopCamera();
+        initCamera();
+    }**/
+
+    public void initCamera ()
+    {
+
+
+        PreferenceManager prefs = new PreferenceManager(getActivity());
+
+        if (prefs.getCameraActivation()) {
+            //Uncomment to see the camera
+
+            CameraView cameraView = getActivity().findViewById(R.id.camera_view);
+
+            if (cameraViewHolder == null) {
+                cameraViewHolder = new CameraViewHolder(getActivity(), cameraView);
+
+                cameraViewHolder.addListener((oldBitmap, newBitmap, rawBitmap, motionDetected) -> {
+                    if (motionDetected)
+                        newImage.setImageBitmap(newBitmap);
+                    else
+                        newImage.setImageResource(R.drawable.blankimage);
+
+                    if (txtCameraStatus != null) {
+                        if (cameraViewHolder.doingVideoProcessing()) {
+                            txtCameraStatus.setText("Recording...");
+                        } else {
+                            txtCameraStatus.setText("");
+                        }
+                    }
+
+                });
+            }
+
+        }
+
+
+        cameraViewHolder.startCamera();
+
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+
+        if (cameraViewHolder != null)
+            cameraViewHolder.destroy();
+
+    }
+
     public void onSensorChanged(SensorEvent event) {
 
     }

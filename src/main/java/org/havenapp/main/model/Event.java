@@ -3,6 +3,7 @@ package org.havenapp.main.model;
 import com.orm.SugarRecord;
 import com.orm.dsl.Ignore;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -13,12 +14,10 @@ import java.util.List;
 
 public class Event extends SugarRecord {
 
-    Date mStartTime;
+    private Date mStartTime;
 
     @Ignore
-    ArrayList<EventTrigger> mEventTriggers;
-
-    public final static long EVENT_WINDOW_TIME = 1000 * 60 * 5; //1 minutes
+    private ArrayList<EventTrigger> mEventTriggers;
 
     public Event ()
     {
@@ -29,6 +28,19 @@ public class Event extends SugarRecord {
     public Date getStartTime ()
     {
         return mStartTime;
+    }
+
+    @Override
+    public boolean delete() {
+        for (EventTrigger trigger : this.getEventTriggers()) {
+            File file = new File(trigger.getPath());
+
+            if (!file.delete() || !trigger.delete()) {
+                return false;
+            }
+        }
+
+        return super.delete();
     }
 
     public void addEventTrigger (EventTrigger eventTrigger)
@@ -42,21 +54,11 @@ public class Event extends SugarRecord {
         if (mEventTriggers.size() == 0) {
             List<EventTrigger> eventTriggers = EventTrigger.find(EventTrigger.class, "M_EVENT_ID = ?", getId() + "");
 
-            for (EventTrigger et : eventTriggers)
-                mEventTriggers.add(et);
+            mEventTriggers.addAll(eventTriggers);
 
         }
 
         return mEventTriggers;
     }
-    /**
-    * Are we within the time window of this event, or should we start a new event?
-     */
-    public boolean insideEventWindow (Date now)
-    {
-        if (mEventTriggers.size() == 0)
-            return now.getTime() - mStartTime.getTime() <= EVENT_WINDOW_TIME;
-        else
-            return now.getTime() - mEventTriggers.get(mEventTriggers.size()-1).getTriggerTime().getTime() <= EVENT_WINDOW_TIME;
-    }
+
 }
