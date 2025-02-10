@@ -3,7 +3,6 @@ package org.havenapp.main.sensors.media;
 import android.hardware.Camera;
 import android.media.MediaRecorder;
 import android.util.Log;
-import android.view.Surface;
 import android.view.SurfaceHolder;
 
 import java.io.IOException;
@@ -44,10 +43,10 @@ public class MediaRecorderTask  {
         mCamera.unlock();
         mMediaRecorder.setCamera(mCamera);
         mMediaRecorder.setPreviewDisplay(mHolder.getSurface());
-    //    mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+        mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.DEFAULT);
         mMediaRecorder.setVideoSource(MediaRecorder.VideoSource.DEFAULT);
         mMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
-     //   mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
+        mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.DEFAULT);
         mMediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.MPEG_4_SP);
         mMediaRecorder.setMaxDuration(mSeconds);
         mMediaRecorder.setOutputFile(mOutputFile);

@@ -7,7 +7,7 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.SEND_SMS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 
     <uses-feature
         android:name="android.hardware.camera"
@@ -34,14 +34,18 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
-    <application xmlns:tools="http://schemas.android.com/tools"
+    <application
         android:name=".HavenApp"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:largeHeap="true"
         android:theme="@style/AppTheme"
-        tools:replace="android:allowBackup">
+        android:fullBackupContent="@xml/backup_config"
+        android:supportsRtl="false"
+        tools:replace="android:allowBackup,android:supportsRtl"
+        tools:ignore="GoogleAppIndexingWarning"
+        android:requestLegacyExternalStorage="true">
         <activity
             android:name=".ListActivity"
             android:configChanges="orientation|screenSize"
@@ -57,15 +61,14 @@
             android:name=".SettingsActivity"
             android:configChanges="orientation|screenSize"
             android:label="@string/settings"
-            android:theme="@style/SettingsTheme"
-            android:windowSoftInputMode="stateHidden" />
+            android:theme="@style/SettingsTheme" />
         <activity
             android:name=".ui.PPAppIntro"
-            android:screenOrientation="portrait" />
+            android:screenOrientation="fullUser" />
         <activity
             android:name=".MonitorActivity"
             android:label="@string/app_name"
-            android:screenOrientation="portrait"
+            android:screenOrientation="fullUser"
             android:launchMode="singleTop"
             android:resizeableActivity="true"
             android:supportsPictureInPicture="true"
@@ -80,6 +83,9 @@
 
         <service
             android:name=".service.MonitorService"
+            android:exported="false" />
+
+        <service android:name=".service.RemoveDeletedFilesJob"
             android:exported="false" />
 
         <meta-data
@@ -108,7 +114,7 @@
             android:configChanges="orientation|screenSize|keyboardHidden" />
         <activity
             android:name=".ui.CameraConfigureActivity"
-            android:screenOrientation="portrait"
+            android:screenOrientation="fullUser"
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <receiver android:name=".sensors.PowerConnectionReceiver">
@@ -119,13 +125,14 @@
         </receiver>
 
         <provider
-            android:name="android.support.v4.content.FileProvider"
+            android:name="androidx.core.content.FileProvider"
             android:authorities="org.havenapp.main.fileprovider"
             android:grantUriPermissions="true"
             android:exported="false">
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_provider_paths" />
+                android:resource="@xml/file_provider_paths"
+                />
         </provider>
 
     </application>
